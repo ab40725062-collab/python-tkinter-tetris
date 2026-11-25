@@ -1,0 +1,25 @@
+@'
+# Python Tkinter Tetris (+ Hold System)
+
+## 1. 프로젝트 개요
+- **프로젝트명:** Python Tkinter Tetris (+ Hold System)
+- **개발 환경:** Python 3.x, `tkinter`, `random`
+- **기획 의도:** 외부 게임 엔진 없이 Python 표준 GUI(`tkinter`)만으로 직관적인 테트리스 게임을 구현하고, 전략적 플레이를 위한 **홀드(Hold)** 기능을 추가함.
+
+## 2. 핵심 기능 및 규칙
+- **게임판:** 가로 10칸 × 세로 20칸(셀당 30px) + 우측 정보 패널(점수, 다음 블록, 홀드 블록, 조작법)
+- **테트로미노:** 7종 블록(I, O, T, S, Z, J, L) 및 고유 색상 적용
+- **조작법:**
+  - `←` `→` : 좌우 이동
+  - `↑` : 시계방향 90도 회전
+  - `↓` : 소프트 드롭
+  - `Space` : 하드 드롭
+  - `C` : 홀드(1턴당 1회 제한)
+  - `R` : 재시작
+
+## 3. 시스템 구조 및 알고리즘
+- **2차원 배열 보드(`self.board`):** `20 × 10` 리스트로 고정 블록 색상과 빈 칸(`None`) 관리
+- **충돌 감지(`check_collision`):** 이동·회전 전 경계 이탈 및 기존 블록 겹침 검증
+- **행렬 회전(`rotate`):** `zip(*shape[::-1])`을 활용한 90도 시계방향 회전
+- **게임 루프(`update_game`):** `root.after(400, self.update_game)` 기반 자동 하강 타이머
+'@ | Set-Content -Path C:\code\tetris_submit\README.md -Encoding utf8

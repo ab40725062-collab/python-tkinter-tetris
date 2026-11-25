@@ -1,0 +1,224 @@
+﻿import tkinter as tk
+import random
+
+CELL_SIZE = 30
+COLS, ROWS = 10, 20
+WIDTH = COLS * CELL_SIZE
+HEIGHT = ROWS * CELL_SIZE
+
+SHAPES = [
+    [[1, 1, 1, 1]],
+    [[1, 1], [1, 1]],
+    [[0, 1, 0], [1, 1, 1]],
+    [[0, 1, 1], [1, 1, 0]],
+    [[1, 1, 0], [0, 1, 1]],
+    [[1, 0, 0], [1, 1, 1]],
+    [[0, 0, 1], [1, 1, 1]]
+]
+COLORS = ["#00f0f0", "#f0f000", "#a000f0", "#00f000", "#f00000", "#0000f0", "#f0a000"]
+
+class TetrisGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Python Tkinter Tetris + Hold")
+        self.root.resizable(False, False)
+
+        self.board = [[None for _ in range(COLS)] for _ in range(ROWS)]
+        self.score = 0
+        self.game_over = False
+        self.held_piece_idx = None
+        self.can_hold = True
+
+        self.canvas = tk.Canvas(root, width=WIDTH + 150, height=HEIGHT, bg="#141419")
+        self.canvas.pack()
+
+        self.root.bind("<Left>", lambda e: self.move(-1, 0))
+        self.root.bind("<Right>", lambda e: self.move(1, 0))
+        self.root.bind("<Down>", lambda e: self.drop())
+        self.root.bind("<Up>", lambda e: self.rotate())
+        self.root.bind("<space>", lambda e: self.hard_drop())
+        self.root.bind("c", lambda e: self.hold_piece())
+        self.root.bind("C", lambda e: self.hold_piece())
+        self.root.bind("r", lambda e: self.restart())
+
+        self.current_piece = self.new_piece()
+        self.next_piece = self.new_piece()
+        self.update_game()
+
+    def new_piece(self):
+        idx = random.randrange(len(SHAPES))
+        return {
+            "idx": idx,
+            "shape": [row[:] for row in SHAPES[idx]],
+            "color": COLORS[idx],
+            "x": COLS // 2 - len(SHAPES[idx][0]) // 2,
+            "y": 0
+        }
+
+    def check_collision(self, shape, dx, dy, px=None, py=None):
+        if px is None: px = self.current_piece["x"]
+        if py is None: py = self.current_piece["y"]
+
+        for r, row in enumerate(shape):
+            for c, val in enumerate(row):
+                if val:
+                    nx = px + c + dx
+                    ny = py + r + dy
+                    if nx < 0 or nx >= COLS or ny >= ROWS:
+                        return True
+                    if ny >= 0 and self.board[ny][nx] is not None:
+                        return True
+        return False
+
+    def move(self, dx, dy):
+        if self.game_over: return
+        if not self.check_collision(self.current_piece["shape"], dx, dy):
+            self.current_piece["x"] += dx
+            self.current_piece["y"] += dy
+            self.draw()
+            return True
+        return False
+
+    def drop(self):
+        if not self.move(0, 1):
+            self.lock_piece()
+
+    def hard_drop(self):
+        if self.game_over: return
+        while self.move(0, 1):
+            pass
+        self.lock_piece()
+
+    def rotate(self):
+        if self.game_over: return
+        rotated = [list(row) for row in zip(*self.current_piece["shape"][::-1])]
+        if not self.check_collision(rotated, 0, 0):
+            self.current_piece["shape"] = rotated
+            self.draw()
+
+    def hold_piece(self):
+        if self.game_over or not self.can_hold:
+            return
+
+        current_idx = self.current_piece["idx"]
+
+        if self.held_piece_idx is None:
+            self.held_piece_idx = current_idx
+            self.current_piece = self.next_piece
+            self.next_piece = self.new_piece()
+        else:
+            held_idx = self.held_piece_idx
+            self.held_piece_idx = current_idx
+            self.current_piece = {
+                "idx": held_idx,
+                "shape": [row[:] for row in SHAPES[held_idx]],
+                "color": COLORS[held_idx],
+                "x": COLS // 2 - len(SHAPES[held_idx][0]) // 2,
+                "y": 0
+            }
+
+        self.can_hold = False
+        self.draw()
+
+    def lock_piece(self):
+        for r, row in enumerate(self.current_piece["shape"]):
+            for c, val in enumerate(row):
+                if val:
+                    ny = self.current_piece["y"] + r
+                    nx = self.current_piece["x"] + c
+                    if ny >= 0:
+                        self.board[ny][nx] = self.current_piece["color"]
+
+        self.clear_lines()
+        self.current_piece = self.next_piece
+        self.next_piece = self.new_piece()
+        self.can_hold = True
+
+        if self.check_collision(self.current_piece["shape"], 0, 0):
+            self.game_over = True
+        self.draw()
+
+    def clear_lines(self):
+        new_board = [row for row in self.board if any(cell is None for cell in row)]
+        cleared = ROWS - len(new_board)
+        for _ in range(cleared):
+            new_board.insert(0, [None] * COLS)
+        self.board = new_board
+        self.score += cleared * 100
+
+    def update_game(self):
+        if not self.game_over:
+            if not self.move(0, 1):
+                self.lock_piece()
+            self.root.after(400, self.update_game)
+
+    def restart(self):
+        self.board = [[None for _ in range(COLS)] for _ in range(ROWS)]
+        self.score = 0
+        self.game_over = False
+        self.held_piece_idx = None
+        self.can_hold = True
+        self.current_piece = self.new_piece()
+        self.next_piece = self.new_piece()
+        self.update_game()
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+
+        for r in range(ROWS):
+            for c in range(COLS):
+                x1, y1 = c * CELL_SIZE, r * CELL_SIZE
+                x2, y2 = x1 + CELL_SIZE, y1 + CELL_SIZE
+                color = self.board[r][c] if self.board[r][c] else "#1e1e24"
+                self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#33333d")
+
+        if not self.game_over:
+            for r, row in enumerate(self.current_piece["shape"]):
+                for c, val in enumerate(row):
+                    if val:
+                        x1 = (self.current_piece["x"] + c) * CELL_SIZE
+                        y1 = (self.current_piece["y"] + r) * CELL_SIZE
+                        x2, y2 = x1 + CELL_SIZE, y1 + CELL_SIZE
+                        self.canvas.create_rectangle(x1, y1, x2, y2, fill=self.current_piece["color"], outline="#ffffff")
+
+        ui_x = WIDTH + 20
+
+        self.canvas.create_text(ui_x, 20, anchor="nw", text="SCORE", fill="#aaaaaa", font=("Arial", 11, "bold"))
+        self.canvas.create_text(ui_x, 40, anchor="nw", text=str(self.score), fill="#ffffff", font=("Arial", 16, "bold"))
+
+        self.canvas.create_text(ui_x, 90, anchor="nw", text="NEXT", fill="#aaaaaa", font=("Arial", 11, "bold"))
+        self.canvas.create_rectangle(ui_x, 115, ui_x + 100, 175, fill="#1e1e24", outline="#33333d")
+        for r, row in enumerate(self.next_piece["shape"]):
+            for c, val in enumerate(row):
+                if val:
+                    rx = ui_x + 25 + c * 20
+                    ry = 125 + r * 20
+                    self.canvas.create_rectangle(rx, ry, rx + 20, ry + 20, fill=self.next_piece["color"], outline="#ffffff")
+
+        self.canvas.create_text(ui_x, 195, anchor="nw", text="HOLD (C)", fill="#aaaaaa", font=("Arial", 11, "bold"))
+        self.canvas.create_rectangle(ui_x, 220, ui_x + 100, 280, fill="#1e1e24", outline="#33333d")
+        if self.held_piece_idx is not None:
+            h_shape = SHAPES[self.held_piece_idx]
+            h_color = COLORS[self.held_piece_idx]
+            for r, row in enumerate(h_shape):
+                for c, val in enumerate(row):
+                    if val:
+                        rx = ui_x + 25 + c * 20
+                        ry = 230 + r * 20
+                        self.canvas.create_rectangle(rx, ry, rx + 20, ry + 20, fill=h_color, outline="#ffffff")
+
+        self.canvas.create_text(ui_x, 305, anchor="nw", text="CONTROLS", fill="#aaaaaa", font=("Arial", 10, "bold"))
+        controls = "← → : Move\n↑ : Rotate\n↓ : Soft Drop\nSpace : Hard\nC : Hold\nR : Restart"
+        self.canvas.create_text(ui_x, 325, anchor="nw", text=controls, fill="#dddddd", font=("Arial", 9))
+
+        if self.game_over:
+            self.canvas.create_rectangle(0, HEIGHT // 3, WIDTH, HEIGHT // 3 + 100, fill="#000000")
+            self.canvas.create_text(WIDTH // 2, HEIGHT // 3 + 35, text="GAME OVER", fill="#ff4d4d", font=("Arial", 20, "bold"), anchor="center")
+            self.canvas.create_text(WIDTH // 2, HEIGHT // 3 + 70, text="Press 'R' to Restart", fill="#ffffff", font=("Arial", 12), anchor="center")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = TetrisGame(root)
+    app.draw()
+    root.mainloop()
